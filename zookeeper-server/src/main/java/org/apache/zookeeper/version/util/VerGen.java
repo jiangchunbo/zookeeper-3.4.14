@@ -148,6 +148,8 @@ public class VerGen {
      *            </ul>
      */
     public static void main(String[] args) {
+        args = new String[] { "3.4.14", "-1", "2025-10-21" };
+
         if (args.length != 3)
             printUsage();
         try {

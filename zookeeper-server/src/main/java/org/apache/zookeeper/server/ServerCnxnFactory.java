@@ -81,6 +81,7 @@ public abstract class ServerCnxnFactory {
     public Login login;
 
     /** Maximum number of connections allowed from particular host (ip) */
+    /* 来自同一个主机允许同时建立的 最大客户端连接数 */
     public abstract int getMaxClientCnxnsPerHost();
 
     /** Maximum number of connections allowed from particular host (ip) */

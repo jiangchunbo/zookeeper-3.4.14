@@ -54,16 +54,26 @@ public class ServerConfig {
      * @throws IllegalArgumentException on invalid usage
      */
     public void parse(String[] args) {
+        // 参数个数：2个、3个或者 4 个
         if (args.length < 2 || args.length > 4) {
             throw new IllegalArgumentException("Invalid number of arguments:" + Arrays.toString(args));
         }
 
+        // 最全参数可以是： 2181 . 2000 60
+
+        // 第一个参数 port 端口号
         clientPortAddress = new InetSocketAddress(Integer.parseInt(args[0]));
+
+        // 第二个参数 dataDir 数据目录，而且也是日志目录
         dataDir = args[1];
         dataLogDir = dataDir;
+
+        // 第三个参数 tickTime 心跳貌似是
         if (args.length >= 3) {
             tickTime = Integer.parseInt(args[2]);
         }
+
+        // 第四个参数 maxClientCnxns
         if (args.length == 4) {
             maxClientCnxns = Integer.parseInt(args[3]);
         }
