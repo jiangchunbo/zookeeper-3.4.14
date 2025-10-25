@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -24,12 +24,22 @@ import java.io.IOException;
 
 /**
  * Interface that is implemented by generated classes.
- * 
+ *
  */
 @InterfaceAudience.Public
 public interface Record {
+
     public void serialize(OutputArchive archive, String tag)
-        throws IOException;
+            throws IOException;
+
+    /**
+     * 从某个二进制数据流中读取字段值，并用这些值来恢复当前对象的内部状态
+     *
+     * @param archive 里面有字节数组
+     * @param tag     标记
+     * @throws IOException
+     */
     public void deserialize(InputArchive archive, String tag)
-        throws IOException;
+            throws IOException;
+
 }

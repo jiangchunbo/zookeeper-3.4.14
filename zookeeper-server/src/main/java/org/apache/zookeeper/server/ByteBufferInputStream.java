@@ -74,8 +74,9 @@ public class ByteBufferInputStream extends InputStream {
 
     static public void byteBuffer2Record(ByteBuffer bb, Record record)
             throws IOException {
-        BinaryInputArchive ia;
-        ia = BinaryInputArchive.getArchive(new ByteBufferInputStream(bb));
+
+        // 把字节数组包装成一个 BinaryInputArchive -> 可以方便的用各种方法读取
+        BinaryInputArchive ia = BinaryInputArchive.getArchive(new ByteBufferInputStream(bb));
         record.deserialize(ia, "request");
     }
 

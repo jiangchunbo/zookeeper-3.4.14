@@ -108,7 +108,15 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
     protected int maxSessionTimeout = -1;
     protected SessionTracker sessionTracker;
     private FileTxnSnapLog txnLogFactory = null;
+
+    /**
+     * 数据库
+     */
     private ZKDatabase zkDb;
+
+    /**
+     * 虽然看起来默认值是 0，其实启动的时候会从文件读取
+     */
     private final AtomicLong hzxid = new AtomicLong(0);
     public final static Exception ok = new Exception("No prob");
     protected RequestProcessor firstProcessor;
@@ -413,6 +421,8 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
             createSessionTracker();
         }
         startSessionTracker();
+
+        // 设置请求处理器
         setupRequestProcessors();
 
         registerJMX();
@@ -422,12 +432,19 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
     }
 
     protected void setupRequestProcessors() {
+        // 其实就是 3 个处理器，他们之间保持顺序
+        // 第 1 个：PrepRequestProcessor
+        // 第 2 个：SyncRequestProcessor
+        // 第 3 个：FinalRequestProcessor
+
+        // 第 2 个和第 3 个之间同步
         RequestProcessor finalProcessor = new FinalRequestProcessor(this);
-        RequestProcessor syncProcessor = new SyncRequestProcessor(this,
-                finalProcessor);
-        ((SyncRequestProcessor)syncProcessor).start();
+        RequestProcessor syncProcessor = new SyncRequestProcessor(this, finalProcessor);
+        ((SyncRequestProcessor)syncProcessor).start(); // 启动线程
+
+        // 第 1 个和第 2 个之间异步
         firstProcessor = new PrepRequestProcessor(this, syncProcessor);
-        ((PrepRequestProcessor)firstProcessor).start();
+        ((PrepRequestProcessor)firstProcessor).start(); // 启动线程
     }
 
     public ZooKeeperServerListener getZooKeeperServerListener() {
@@ -726,6 +743,8 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
     }
     
     public void submitRequest(Request si) {
+        // 如果第一个处理器是 null，那肯定还没初始化好，等待初始化
+        // 其实就是 PrepRequestProcessor
         if (firstProcessor == null) {
             synchronized (this) {
                 try {
@@ -744,10 +763,13 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
                 }
             }
         }
+
         try {
             touch(si.cnxn);
             boolean validpacket = Request.isValid(si.type);
+
             if (validpacket) {
+                // 表面叫 processRequest 其实是投放到 BlockingQueue 中
                 firstProcessor.processRequest(si);
                 if (si.cnxn != null) {
                     incInProcess();
@@ -963,12 +985,17 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
         // We have the request, now process and setup for next
         InputStream bais = new ByteBufferInputStream(incomingBuffer);
         BinaryInputArchive bia = BinaryInputArchive.getArchive(bais);
+
+        // 读取 2 个 int 值，表示 header
         RequestHeader h = new RequestHeader();
         h.deserialize(bia, "header");
+
         // Through the magic of byte buffers, txn will not be
-        // pointing
-        // to the start of the txn
+        // pointing to the start of the txn
+        // 复制一个缓冲区，估计是 header 已经读取完毕，从 header 之后开始
         incomingBuffer = incomingBuffer.slice();
+
+        // 如果本次请求是 auth
         if (h.getType() == OpCode.auth) {
             LOG.info("got auth packet " + cnxn.getRemoteSocketAddress());
             AuthPacket authPacket = new AuthPacket();
@@ -1011,6 +1038,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
             }
             return;
         } else {
+            // 与安全有关可能
             if (h.getType() == OpCode.sasl) {
                 Record rsp = processSasl(incomingBuffer,cnxn);
                 ReplyHeader rh = new ReplyHeader(h.getXid(), 0, KeeperException.Code.OK.intValue());
@@ -1021,6 +1049,8 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider {
                 Request si = new Request(cnxn, cnxn.getSessionId(), h.getXid(),
                   h.getType(), incomingBuffer, cnxn.getAuthInfo());
                 si.setOwner(ServerCnxn.me);
+
+                // 使用 requestThrottler 来处理请求
                 submitRequest(si);
             }
         }

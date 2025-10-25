@@ -6,9 +6,9 @@
  * to you under the Apache License, Version 2.0 (the
  * "License"); you may not use this file except in compliance
  * with the License.  You may obtain a copy of the License at
- *
- *     http://www.apache.org/licenses/LICENSE-2.0
- *
+ * <p>
+ * http://www.apache.org/licenses/LICENSE-2.0
+ * <p>
  * Unless required by applicable law or agreed to in writing, software
  * distributed under the License is distributed on an "AS IS" BASIS,
  * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
@@ -22,22 +22,40 @@ import java.io.IOException;
 
 /**
  * Interface that all the Deserializers have to implement.
+ * <p>
+ * 外部二进制/文本数据转回 Java 对象时，不同格式的读取细节完全不同
  *
  */
 public interface InputArchive {
+
     public byte readByte(String tag) throws IOException;
+
     public boolean readBool(String tag) throws IOException;
+
     public int readInt(String tag) throws IOException;
+
     public long readLong(String tag) throws IOException;
+
     public float readFloat(String tag) throws IOException;
+
     public double readDouble(String tag) throws IOException;
+
     public String readString(String tag) throws IOException;
+
     public byte[] readBuffer(String tag) throws IOException;
+
     public void readRecord(Record r, String tag) throws IOException;
+
     public void startRecord(String tag) throws IOException;
+
     public void endRecord(String tag) throws IOException;
+
     public Index startVector(String tag) throws IOException;
+
     public void endVector(String tag) throws IOException;
+
     public Index startMap(String tag) throws IOException;
+
     public void endMap(String tag) throws IOException;
+
 }

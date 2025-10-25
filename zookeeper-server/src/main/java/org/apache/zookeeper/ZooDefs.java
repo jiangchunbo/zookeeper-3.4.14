@@ -51,6 +51,9 @@ public class ZooDefs {
 
         public final int sync = 9;
 
+        /**
+         * 每个一定时间发送的 ping
+         */
         public final int ping = 11;
 
         public final int getChildren2 = 12;

@@ -1,0 +1,9 @@
+module com.jiangchunbo {
+    class Person {
+        int      id;
+        ustring   name;
+    }
+    class AddressBook {
+        vector<Person> persons;
+    }
+}
