@@ -165,12 +165,18 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
     }
 
     ChangeRecord getRecordForPath(String path) throws KeeperException.NoNodeException {
-        ChangeRecord lastChange = null;
+        ChangeRecord lastChange;
         synchronized (zks.outstandingChanges) {
+            // 通过寻找 ChangeRecord
             lastChange = zks.outstandingChangesForPath.get(path);
+
+            // 如果找不到了，可能这个 path 已经修改并持久化到了 DataTree 中，或者根本都没有人修改过
+            // 找不到，那么我这次要修改，我自己生成一个变更记录
             if (lastChange == null) {
+                // 从 ZKDatabase 获取当前数据
                 DataNode n = zks.getZKDatabase().getNode(path);
                 if (n != null) {
+                    // 获取所有的子节点
                     Set<String> children;
                     synchronized (n) {
                         children = n.getChildren();
@@ -329,6 +335,8 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
      * This method will be called inside the ProcessRequestThread, which is a
      * singleton, so there will be a single thread calling this code.
      *
+     * pRequest2Txn: prepare request to transaction 把请求预处理并转换为事务
+     *
      * @param type
      * @param zxid
      * @param request
@@ -348,6 +356,8 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 CreateRequest createRequest = (CreateRequest) record;
                 if (deserialize)
                     ByteBufferInputStream.byteBuffer2Record(request.request, createRequest);
+
+                // 请求创建的 path
                 String path = createRequest.getPath();
                 int lastSlash = path.lastIndexOf('/');
                 if (lastSlash == -1 || path.indexOf('\0') != -1 || failCreate) {
@@ -359,18 +369,30 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 if (!fixupACL(request.authInfo, listACL)) {
                     throw new KeeperException.InvalidACLException(path);
                 }
+
+                // 如果用户使用 /b 这种，得到的 parentPath 就是 ""
                 String parentPath = path.substring(0, lastSlash);
+
+                // 获取 parentPath 变更记录 (也有可能我自己创建一个)
                 ChangeRecord parentRecord = getRecordForPath(parentPath);
 
-                checkACL(zks, parentRecord.acl, ZooDefs.Perms.CREATE,
-                        request.authInfo);
+                checkACL(zks, parentRecord.acl, ZooDefs.Perms.CREATE, request.authInfo);
+
+                // 获取 parent cversion
                 int parentCVersion = parentRecord.stat.getCversion();
-                CreateMode createMode =
-                        CreateMode.fromFlag(createRequest.getFlags());
+
+                // 用户需要创建的节点类型，比如临时、持久？
+                CreateMode createMode = CreateMode.fromFlag(createRequest.getFlags());
+
+                // 如果创建模式是 序列，那么就增加一个后缀 + 00000_00000 这样
                 if (createMode.isSequential()) {
                     path = path + String.format(Locale.ENGLISH, "%010d", parentCVersion);
                 }
+
+                // 验证 path，比如不能是 / 结尾
                 validatePath(path, request.sessionId);
+
+                // create -> 快速判断，path 是否存在，存在就快速报错
                 try {
                     if (getRecordForPath(path) != null) {
                         throw new KeeperException.NodeExistsException(path);
@@ -378,10 +400,14 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 } catch (KeeperException.NoNodeException e) {
                     // ignore this one
                 }
+
+                // 临时节点不能具有子节点
                 boolean ephemeralParent = parentRecord.stat.getEphemeralOwner() != 0;
                 if (ephemeralParent) {
                     throw new KeeperException.NoChildrenForEphemeralsException(path);
                 }
+
+                // 新版本 cversion + 1
                 int newCversion = parentRecord.stat.getCversion() + 1;
                 request.txn = new CreateTxn(path, createRequest.getData(),
                         listACL,
@@ -390,9 +416,13 @@ public class PrepRequestProcessor extends ZooKeeperCriticalThread implements
                 if (createMode.isEphemeral()) {
                     s.setEphemeralOwner(request.sessionId);
                 }
+
+                // 产生一个成功之后的
                 parentRecord = parentRecord.duplicate(request.hdr.getZxid());
                 parentRecord.childCount++;
                 parentRecord.stat.setCversion(newCversion);
+
+                // 添加到 outstandingChanges 存储修改记录，还没有修改 DataTree
                 addChangeRecord(parentRecord);
                 addChangeRecord(new ChangeRecord(request.hdr.getZxid(), path, s,
                         0, listACL));

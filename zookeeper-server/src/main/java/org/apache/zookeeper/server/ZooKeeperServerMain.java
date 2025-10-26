@@ -96,6 +96,8 @@ public class ZooKeeperServerMain {
             config.parse(args);
         }
 
+
+        // 运行
         runFromConfig(config);
     }
 
@@ -113,6 +115,8 @@ public class ZooKeeperServerMain {
             // so rather than spawning another thread, we will just call
             // run() in this thread.
             // create a file logger url from the command line args
+
+            // 创建 zk server
             final ZooKeeperServer zkServer = new ZooKeeperServer();
             // Registers shutdown handler which will be used to know the
             // server error or shutdown state changes.
@@ -120,6 +124,7 @@ public class ZooKeeperServerMain {
             zkServer.registerServerShutdownHandler(
                     new ZooKeeperServerShutdownHandler(shutdownLatch));
 
+            // 日志目录，数据目录
             txnLog = new FileTxnSnapLog(new File(config.dataLogDir), new File(
                     config.dataDir));
             txnLog.setServerStats(zkServer.serverStats());
@@ -128,11 +133,12 @@ public class ZooKeeperServerMain {
             zkServer.setMinSessionTimeout(config.minSessionTimeout);
             zkServer.setMaxSessionTimeout(config.maxSessionTimeout);
 
+            // 创建 ConnectionFactory 连接工厂
             cnxnFactory = ServerCnxnFactory.createFactory();
             cnxnFactory.configure(config.getClientPortAddress(),
                     config.getMaxClientCnxns());
 
-            // 启动 zk
+            // 启动 zk (比较复杂)
             cnxnFactory.startup(zkServer);
 
             // Watch status of ZooKeeper server. It will do a graceful shutdown
