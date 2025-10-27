@@ -1201,12 +1201,14 @@ public class ZooKeeper {
 
         final String serverPath = prependChroot(clientPath);
 
+        // 构造请求头、请求体
         RequestHeader h = new RequestHeader();
         h.setType(ZooDefs.OpCode.getData);
         GetDataRequest request = new GetDataRequest();
         request.setPath(serverPath);
         request.setWatch(watcher != null);
-        GetDataResponse response = new GetDataResponse();
+
+        GetDataResponse response = new GetDataResponse(); // 待填充
         ReplyHeader r = cnxn.submitRequest(h, request, response, wcb);
         if (r.getErr() != 0) {
             throw KeeperException.create(KeeperException.Code.get(r.getErr()),
@@ -1259,12 +1261,18 @@ public class ZooKeeper {
 
         final String serverPath = prependChroot(clientPath);
 
+        // 创建 request header，设置操作码
         RequestHeader h = new RequestHeader();
         h.setType(ZooDefs.OpCode.getData);
+
         GetDataRequest request = new GetDataRequest();
         request.setPath(serverPath);
         request.setWatch(watcher != null);
+
+        // 创建了一个空的 response
         GetDataResponse response = new GetDataResponse();
+
+        // 入队
         cnxn.queuePacket(h, new ReplyHeader(), request, response, cb,
                 clientPath, serverPath, ctx, wcb);
     }

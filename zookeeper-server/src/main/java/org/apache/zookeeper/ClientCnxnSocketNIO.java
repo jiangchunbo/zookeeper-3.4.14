@@ -92,6 +92,7 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
                     updateLastHeard();
                     initialized = true;
                 } else {
+                    // 处理增删查改
                     sendThread.readResponse(incomingBuffer);
                     lenBuffer.clear();
                     incomingBuffer = lenBuffer;
@@ -99,6 +100,8 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
                 }
             }
         }
+
+        // 可以向外推送数据了
         if (sockKey.isWritable()) {
             synchronized (outgoingQueue) {
                 Packet p = findSendablePacket(outgoingQueue,
@@ -107,6 +110,9 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
                 if (p != null) {
                     updateLastSend();
                     // If we already started writing p, p.bb will already exist
+                    // 如果我们已经开始写 packet，p.bb 才会存在
+
+                    // bb 不存在，创建 bb
                     if (p.bb == null) {
                         if ((p.requestHeader != null) &&
                                 (p.requestHeader.getType() != OpCode.ping) &&
@@ -160,6 +166,8 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
             if (outgoingQueue.isEmpty()) {
                 return null;
             }
+
+            // 返回第一个，但是不会移除
             if (outgoingQueue.getFirst().bb != null // If we've already starting sending the first packet, we better finish
                     || !clientTunneledAuthenticationInProgress) {
                 return outgoingQueue.getFirst();
@@ -195,8 +203,12 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
     @Override
     void cleanup() {
         if (sockKey != null) {
+            // 取消 SelectionKey
             SocketChannel sock = (SocketChannel) sockKey.channel();
             sockKey.cancel();
+
+
+            // 关闭了 input output
             try {
                 sock.socket().shutdownInput();
             } catch (IOException e) {
@@ -349,6 +361,9 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
     void doTransport(int waitTimeOut, List<Packet> pendingQueue, LinkedList<Packet> outgoingQueue,
                      ClientCnxn cnxn)
             throws IOException, InterruptedException {
+
+        // 阻塞获取 Socket 事件
+        // wait timeout 是之前计算出来的超时时间
         selector.select(waitTimeOut);
         Set<SelectionKey> selected;
         synchronized (this) {
@@ -360,15 +375,24 @@ public class ClientCnxnSocketNIO extends ClientCnxnSocket {
         updateNow();
         for (SelectionKey k : selected) {
             SocketChannel sc = ((SocketChannel) k.channel());
+
+            // 1. SocketChannel 已经准备好完成连接，或者连接中遇到了错误
             if ((k.readyOps() & SelectionKey.OP_CONNECT) != 0) {
+                // finishConnect: 如果连接成功，调用该方法即可完成连接；连接失败，调用该方法抛出异常
                 if (sc.finishConnect()) {
                     updateLastSendAndHeard();
+                    // 初始化连接
                     sendThread.primeConnection();
                 }
-            } else if ((k.readyOps() & (SelectionKey.OP_READ | SelectionKey.OP_WRITE)) != 0) {
+            }
+            // 2. SocketChannel 存在读/写事件
+            else if ((k.readyOps() & (SelectionKey.OP_READ | SelectionKey.OP_WRITE)) != 0) {
                 doIO(pendingQueue, outgoingQueue, cnxn);
             }
         }
+
+        // 这里在其他线程入队 outgoingQueue 之后会唤醒 Selector
+        // 只不过 Selector 此时没有 SelectionKey，所以会直接进入这里
         if (sendThread.getZkState().isConnected()) {
             synchronized (outgoingQueue) {
                 if (findSendablePacket(outgoingQueue,
