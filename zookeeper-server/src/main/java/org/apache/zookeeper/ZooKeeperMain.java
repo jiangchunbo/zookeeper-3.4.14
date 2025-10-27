@@ -200,21 +200,25 @@ public class ZooKeeperMain {
         /**
          * Parses a command line that may contain one or more flags
          * before an optional command string
+         *
          * @param args command line arguments
          * @return true if parsing succeeded, false otherwise.
          */
         public boolean parseOptions(String[] args) {
+            // 使用迭代器遍历 args
             List<String> argList = Arrays.asList(args);
             Iterator<String> it = argList.iterator();
-
             while (it.hasNext()) {
+                // 似乎只允许 -server -timeout -r
                 String opt = it.next();
                 try {
                     if (opt.equals("-server")) {
                         options.put("server", it.next());
-                    } else if (opt.equals("-timeout")) {
+                    }
+                    if (opt.equals("-timeout")) {
                         options.put("timeout", it.next());
-                    } else if (opt.equals("-r")) {
+                    }
+                    if (opt.equals("-r")) {
                         options.put("readonly", "true");
                     }
                 } catch (NoSuchElementException e) {
@@ -223,6 +227,7 @@ public class ZooKeeperMain {
                     return false;
                 }
 
+                // 其他不是以 "-" 开头的，添加到 cmdArgs 中，而且只能放在最后
                 if (!opt.startsWith("-")) {
                     command = opt;
                     cmdArgs = new ArrayList<String>();
@@ -238,6 +243,7 @@ public class ZooKeeperMain {
 
         /**
          * Breaks a string into command + arguments.
+         *
          * @param cmdstring string of form "cmd arg1 arg2..etc"
          * @return true if parsing succeeded.
          */
@@ -286,14 +292,22 @@ public class ZooKeeperMain {
     }
 
     protected void connectToZK(String newHost) throws InterruptedException, IOException {
+        // 打算连接到 zk，但是发现还存在连接，先关闭
+        // 可能是一个谨慎写法
         if (zk != null && zk.getState().isAlive()) {
             zk.close();
         }
+
+        //
         host = newHost;
         boolean readOnly = cl.getOption("readonly") != null;
-        zk = new ZooKeeper(host,
-                Integer.parseInt(cl.getOption("timeout")),
-                new MyWatcher(), readOnly);
+
+        // 似乎在后续的版本中有一个 ZooKeeperAdmin，继承的就是 ZooKeeper
+        // 不管是命令行，还是 Java Client 都是用的 ZooKeeper 这个类
+        zk = new ZooKeeper(host, // 连接的主机，默认是 localhost:2181
+                Integer.parseInt(cl.getOption("timeout")), // 超时时间 默认是 30_000 30s
+                new MyWatcher(),
+                readOnly);
     }
 
     public static void main(String args[])
@@ -303,12 +317,17 @@ public class ZooKeeperMain {
         ZooKeeperMain main = new ZooKeeperMain(args);
 
         // 运行
+        // 这时候 command args 都解析好，存放在属性里了
+        // ZK 也连接上
         main.run();
     }
 
     public ZooKeeperMain(String args[]) throws IOException, InterruptedException {
+        // 解析参数
         cl.parseOptions(args);
+
         System.out.println("Connecting to " + cl.getOption("server"));
+
         connectToZK(cl.getOption("server"));
         //zk = new ZooKeeper(cl.getOption("server"),
 //                Integer.parseInt(cl.getOption("timeout")), new MyWatcher());
@@ -320,6 +339,7 @@ public class ZooKeeperMain {
 
     @SuppressWarnings("unchecked")
     void run() throws KeeperException, IOException, InterruptedException {
+        // cl.getCommand() 表示除了常规的 option -server 这种之外的没有 - 前缀的参数，
         if (cl.getCommand() == null) {
             System.out.println("Welcome to ZooKeeper!");
 
@@ -403,9 +423,10 @@ public class ZooKeeperMain {
     /**
      * trim the quota tree to recover unwanted tree elements
      * in the quota's tree
-     * @param zk the zookeeper client
+     *
+     * @param zk   the zookeeper client
      * @param path the path to start from and go up and see if their
-     * is any unwanted parent in the path.
+     *             is any unwanted parent in the path.
      * @return true if sucessful
      * @throws KeeperException
      * @throws IOException
@@ -428,12 +449,13 @@ public class ZooKeeperMain {
 
     /**
      * this method deletes quota for a node.
-     * @param zk the zookeeper client
-     * @param path the path to delete quota for
-     * @param bytes true if number of bytes needs to
-     * be unset
+     *
+     * @param zk       the zookeeper client
+     * @param path     the path to delete quota for
+     * @param bytes    true if number of bytes needs to
+     *                 be unset
      * @param numNodes true if number of nodes needs
-     * to be unset
+     *                 to be unset
      * @return true if quota deletion is successful
      * @throws KeeperException
      * @throws IOException
@@ -508,9 +530,10 @@ public class ZooKeeperMain {
 
     /**
      * this method creates a quota node for the path
-     * @param zk the ZooKeeper client
-     * @param path the path for which quota needs to be created
-     * @param bytes the limit of bytes on this path
+     *
+     * @param zk       the ZooKeeper client
+     * @param path     the path for which quota needs to be created
+     * @param bytes    the limit of bytes on this path
      * @param numNodes the limit of number of nodes on this path
      * @return true if its successful and false if not.
      */

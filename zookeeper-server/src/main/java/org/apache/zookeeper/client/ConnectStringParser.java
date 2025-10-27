@@ -47,30 +47,42 @@ public final class ConnectStringParser {
      */
     public ConnectStringParser(String connectString) {
         // parse out chroot, if any
+
+        // 这个连接字符串，如果你要加 chroot，就要加到 /
         int off = connectString.indexOf('/');
         if (off >= 0) {
+            // 截取第一个 / 往后的 path，这个就是 chrootPath
             String chrootPath = connectString.substring(off);
             // ignore "/" chroot spec, same as null
+            // 如果长度是 1，说明末尾只有一个 /。例如 127.0.0.1:2181/，就跟没配一样
             if (chrootPath.length() == 1) {
                 this.chrootPath = null;
-            } else {
+            }
+            // 验证 chrootPath，不能以 / 结尾
+            else {
                 PathUtils.validatePath(chrootPath);
                 this.chrootPath = chrootPath;
             }
+
+            // 分离 connectString，这个才是真正的连接字符串
             connectString = connectString.substring(0, off);
         } else {
             this.chrootPath = null;
         }
 
+        // 使用 , 分开
         String hostsList[] = connectString.split(",");
         for (String host : hostsList) {
             int port = DEFAULT_PORT;
             int pidx = host.lastIndexOf(':');
             if (pidx >= 0) {
                 // otherwise : is at the end of the string, ignore
+                // 你的 ':' 总不能是最后一个字符吧！
+                // 解析 port
                 if (pidx < host.length() - 1) {
                     port = Integer.parseInt(host.substring(pidx + 1));
                 }
+                // 分离出 host
                 host = host.substring(0, pidx);
             }
             serverAddresses.add(InetSocketAddress.createUnresolved(host, port));
